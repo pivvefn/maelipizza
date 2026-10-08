@@ -4,7 +4,7 @@ import RevealOnScroll from "@/components/RevealOnScroll";
 import { getFeaturedPizzas } from "@/lib/menu";
 import { images } from "@/lib/images";
 
-export const revalidate = 600;
+export const revalidate = 60;
 
 export default async function HomePage() {
   const featuredPizzas = await getFeaturedPizzas();

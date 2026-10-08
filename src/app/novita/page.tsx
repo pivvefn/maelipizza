@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     "Tutte le novità di Maeli Pizza: orari speciali, aperture straordinarie, festività, impasti e nuove pizze del mese sfornate ogni sera a Campocroce.",
 };
 
-export const revalidate = 600;
+export const revalidate = 60;
 
 export default async function NovitaPage() {
   const [labels, firstPage] = await Promise.all([
