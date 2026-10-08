@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Epilogue, Plus_Jakarta_Sans } from "next/font/google";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const epilogue = Epilogue({
@@ -59,6 +60,7 @@ export default function RootLayout({
         <Header />
         {children}
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
