@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     "Listino Maeli: Pizze Classiche, Gustose, Bianche e Calzoni con ingredienti e prezzi aggiornati, teglie, formati Baby e extra.",
 };
 
-export const revalidate = 600;
+export const revalidate = 60;
 
 export default async function ListinoPage() {
   const menu = await getMenu();
