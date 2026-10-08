@@ -1,0 +1,30 @@
+# --- Dipendenze ---
+/node_modules
+/.pnp
+.pnp.*
+
+# --- Next.js ---
+/.next/
+/out/
+/build
+
+# --- Build ---
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Variabili d'ambiente: MAI committare ---
+# .env contiene le chiavi segrete di Supabase e resta solo in locale.
+# .env.example è il modello pubblico da copiare.
+.env
+.env.*
+!.env.example
+
+# --- Editor / Sistema ---
+.DS_Store
+*.pem
+.vscode/*
+!.vscode/extensions.json
+.idea
+npm-debug.log*
+.eslintcache
+.vercel
