@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Epilogue, Plus_Jakarta_Sans } from "next/font/google";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { CartProvider } from "@/lib/cart";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
@@ -57,10 +58,12 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
         />
-        <Header />
-        {children}
-        <Footer />
-        <Analytics />
+        <CartProvider>
+          <Header />
+          {children}
+          <Footer />
+          <Analytics />
+        </CartProvider>
       </body>
     </html>
   );

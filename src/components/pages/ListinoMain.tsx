@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { AllergenIcon, AllergeniPizza } from "@/components/AllergenIcon";
+import { useCart } from "@/lib/cart";
 import { images } from "@/lib/images";
 import {
   Collapsible,
@@ -41,6 +42,8 @@ const SECTION_SUBTITLE: Record<string, string> = {
 };
 
 function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
+  const { aggiungi } = useCart();
+
   return (
     <div
       className={`flex items-start justify-between py-2 ${
@@ -74,6 +77,7 @@ function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
             type="button"
             title="Aggiungi"
             aria-label={`Aggiungi ${pizza.nome}`}
+            onClick={() => aggiungi(pizza)}
             className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-primary/40 text-primary hover:bg-secondary hover:text-on-secondary hover:border-secondary hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
           >
             <span className="material-symbols-outlined text-[13px]! wide:text-[15px]!">add</span>

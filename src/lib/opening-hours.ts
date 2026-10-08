@@ -13,7 +13,15 @@ export interface OpeningStatus {
   subline: string;
 }
 
-export function getOpeningStatus(targetDate: Date = new Date()): OpeningStatus {
+const GIORNI_APERTURA = ["Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const ORA_TAGLIO_WHATSAPP = 17 * 60 + 30;
+
+function getDateInfo(targetDate: Date): {
+  weekday: string;
+  hour: number;
+  minute: number;
+} {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Rome",
     weekday: "short",
@@ -28,13 +36,18 @@ export function getOpeningStatus(targetDate: Date = new Date()): OpeningStatus {
   let minute = 0;
 
   for (const part of parts) {
-    if (part.type === "weekday") weekday = part.value; 
+    if (part.type === "weekday") weekday = part.value;
     if (part.type === "hour") hour = parseInt(part.value, 10);
     if (part.type === "minute") minute = parseInt(part.value, 10);
   }
 
-  const openDays = ["Wed", "Thu", "Fri", "Sat", "Sun"];
-  const isOpenToday = openDays.includes(weekday);
+  return { weekday, hour, minute };
+}
+
+export function getOpeningStatus(targetDate: Date = new Date()): OpeningStatus {
+  const { weekday, hour, minute } = getDateInfo(targetDate);
+
+  const isOpenToday = GIORNI_APERTURA.includes(weekday);
 
   const currentMinutes = hour * 60 + minute;
   const openMinutes = 18 * 60 + 30; 
@@ -72,4 +85,23 @@ export function useOpeningStatus(): OpeningStatus {
   }, []);
 
   return status;
+}
+
+export function isWhatsAppAttivo(targetDate: Date = new Date()): boolean {
+  const { weekday, hour, minute } = getDateInfo(targetDate);
+  if (!GIORNI_APERTURA.includes(weekday)) return false;
+  return hour * 60 + minute < ORA_TAGLIO_WHATSAPP;
+}
+
+export function useWhatsAppAttivo(): boolean {
+  const [attivo, setAttivo] = useState<boolean>(() => isWhatsAppAttivo());
+
+  useEffect(() => {
+    const update = () => setAttivo(isWhatsAppAttivo());
+    update();
+    const interval = setInterval(update, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return attivo;
 }

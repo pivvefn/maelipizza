@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useOpeningStatus } from "@/lib/opening-hours";
+import { useCart } from "@/lib/cart";
 import { images } from "@/lib/images";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,7 @@ const NAV_LINKS = [
 export default function Header() {
   const pathname = usePathname();
   const openingStatus = useOpeningStatus();
+  const { totalePezzi } = useCart();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
@@ -121,18 +123,18 @@ export default function Header() {
             <span className="sm:hidden font-semibold">Chiama</span>
           </a>
 
-          <button
-            className="relative p-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
-            type="button"
+          <Link
+            href="/listino/carrello"
             aria-label="Carrello"
+            className="relative p-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
           >
             <span className="material-symbols-outlined text-[20px]">
               shopping_bag
             </span>
             <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm flex items-center justify-center font-bold">
-              0
+              {totalePezzi}
             </span>
-          </button>
+          </Link>
 
           <Sheet>
             <SheetTrigger asChild>
