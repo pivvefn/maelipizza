@@ -68,27 +68,6 @@ function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
         <span className="font-title-lg text-title-lg font-bold text-secondary whitespace-nowrap">
           € {formatPrice(pizza.prezzo)}
         </span>
-
-        <div className="flex items-center gap-1 mt-1.5">
-          <button
-            type="button"
-            title="Aggiungi"
-            aria-label={`Aggiungi ${pizza.nome}`}
-            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-primary/40 text-primary hover:bg-secondary hover:text-on-secondary hover:border-secondary hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[13px]! wide:text-[15px]!">add</span>
-            <span className="hidden wide:inline">Aggiungi</span>
-          </button>
-          <button
-            type="button"
-            title="Modifica"
-            aria-label={`Modifica ${pizza.nome}`}
-            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface hover:border-outline hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[13px]! wide:text-[15px]!">edit</span>
-            <span className="hidden wide:inline">Modifica</span>
-          </button>
-        </div>
       </div>
     </div>
   );

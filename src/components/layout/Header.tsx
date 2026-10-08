@@ -121,19 +121,6 @@ export default function Header() {
             <span className="sm:hidden font-semibold">Chiama</span>
           </a>
 
-          <button
-            className="relative p-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
-            type="button"
-            aria-label="Carrello"
-          >
-            <span className="material-symbols-outlined text-[20px]">
-              shopping_bag
-            </span>
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm flex items-center justify-center font-bold">
-              0
-            </span>
-          </button>
-
           <Sheet>
             <SheetTrigger asChild>
               <Button
