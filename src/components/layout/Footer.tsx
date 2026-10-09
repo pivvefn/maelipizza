@@ -153,8 +153,18 @@ export default function Footer() {
             <span className="hidden md:inline">•</span>
             <span>Tutti i diritti riservati</span>
             <span className="hidden md:inline">•</span>
-            <a className="hover:text-primary transition-colors" href="#">
+            <a
+              className="hover:text-primary transition-colors"
+              href="/informativa-privacy"
+            >
               Informativa e privacy
+            </a>
+            <span className="hidden md:inline">•</span>
+            <a
+              className="hover:text-primary transition-colors"
+              href="/informativa-privacy#cookie"
+            >
+              Cookie
             </a>
           </div>
           <div className="flex items-center gap-space-md">

@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Epilogue, Plus_Jakarta_Sans } from "next/font/google";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { Analytics } from "@vercel/analytics/next";
+import { ConsentProvider } from "@/lib/consent";
+import CookieConsent from "@/components/CookieConsent";
+import AnalyticsConsenso from "@/components/AnalyticsConsenso";
 import "./globals.css";
 
 const epilogue = Epilogue({
@@ -57,10 +59,13 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
         />
-        <Header />
-        {children}
-        <Footer />
-        <Analytics />
+        <ConsentProvider>
+          <Header />
+          {children}
+          <Footer />
+          <AnalyticsConsenso />
+          <CookieConsent />
+        </ConsentProvider>
       </body>
     </html>
   );
