@@ -5,6 +5,7 @@ export type Pizza = {
   prezzo: number;
 
   ingredienti: string;
+  ingredientiNomi: string[];
   isFeatured: boolean;
   nota: string | null;
 
@@ -22,6 +23,10 @@ export type MenuSection = {
 };
 
 export type Impasto = { nome: string; prezzo: number };
+
+export type Dimensione = { nome: string; prezzo: number };
+
+export type IngredienteExtra = { nome: string; prezzo: number };
 
 export type Formato = {
 
@@ -45,6 +50,10 @@ export type ExtraVoce = { nome: string; prezzo: number };
 export type MenuData = {
   sections: MenuSection[];
   impasti: Impasto[];
+  impastiCompleti: Impasto[];
+
+  dimensioni: Dimensione[];
+  ingredientiExtra: IngredienteExtra[];
 
   formatoBaby: number | null;
 
@@ -55,10 +64,47 @@ export type MenuData = {
   teglie: Teglia[];
 
   extra: ExtraVoce[];
+
+  /** Messaggi standard predefiniti per le note (tabella pizza_note). */
+  noteStandard: string[];
 };
 
-export type TegliaVoce = { nome: string; prezzo: number };
+/** Voce del menu Mini: nome della mini + i suoi ingredienti dal listino. */
+export type OpzioneMini = {
+  nome: string;
+  ingredienti: string;
+  ingredientiNomi: string[];
+};
 
+/**
+ * Le6 pizze mini arrivano dalla descrizione della categoria "Pizza Mini"
+ * (sigla "mini"): "Solo Margherita, Funghi, Chips, Mc Donald, Viennese e
+ * Cotto". I nomi vengono abbinati alle pizze del listino per gli ingredienti.
+ */
+export function costruisciOpzioniMini(menu: MenuData): OpzioneMini[] {
+  const formato = menu.formati.find((f) => f.sigla === "mini");
+  if (!formato?.descrizione) return [];
+  const testo = formato.descrizione
+    .replace(/^solo\s+/i, "")
+    .replace(/\se\s+/gi, ",");
+  const nomi = testo
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const tutte = menu.sections.flatMap((s) => s.pizzas);
+  return nomi.map((nome) => {
+    const pizza = tutte.find(
+      (p) => p.nome.trim().toLowerCase() === nome.toLowerCase(),
+    );
+    return {
+      nome: pizza?.nome ?? nome,
+      ingredienti: pizza?.ingredienti ?? "",
+      ingredientiNomi: pizza?.ingredientiNomi ?? [],
+    };
+  });
+}
+
+export type TegliaVoce = { nome: string; prezzo: number };
 export type Teglia = {
   nome: string;
   badge: string;
@@ -67,6 +113,7 @@ export type Teglia = {
 
 type DbIngredient = {
   nome: string;
+  prezzo_aggiunta: number | null;
   is_allergene: boolean | null;
   allergeni_ids: number[] | null;
 };
@@ -141,16 +188,17 @@ function collectAllergeni(links: DbLink[]): number[] {
 export async function getMenu(): Promise<MenuData> {
   const supabase = createAdminClient();
 
-  const [cats, doughs, sizes, allergeni] = await Promise.all([
+  const [cats, doughs, sizes, allergeni, ingredienti] = await Promise.all([
     supabase
       .from("menu_categories")
       .select(
-        "nome, ordine_visualizzazione, description, is_active, is_new, menu_items(nome, prezzo_base, is_featured, note_extra, pizza_ingredients(ingredients(nome, is_allergene, allergeni_ids)))",
+        "nome, ordine_visualizzazione, description, is_active, is_new, menu_items(nome, prezzo_base, is_featured, note_extra, pizza_ingredients(ingredients(nome, prezzo_aggiunta, is_allergene, allergeni_ids)))",
       )
       .order("ordine_visualizzazione"),
     supabase.from("dough_types").select("nome, variazione_prezzo, is_active"),
     supabase.from("pizza_sizes").select("nome, variazione_prezzo, is_active"),
     supabase.from("allergeni").select("id, nome, descrizione").order("id"),
+    supabase.from("ingredients").select("nome, prezzo_aggiunta"),
   ]);
 
   if (cats.error) {
@@ -177,18 +225,20 @@ export async function getMenu(): Promise<MenuData> {
       nome: category.nome,
       isNovita: category.is_new === true,
       descrizione: category.description ?? null,
-      pizzas: items.map((item) => ({
-        nome: item.nome,
-        prezzo: Number(item.prezzo_base),
-        ingredienti: formatIngredienti(
-          (item.pizza_ingredients ?? [])
-            .map((link) => link?.ingredients?.nome)
-            .filter((nome): nome is string => Boolean(nome)),
-        ),
-        isFeatured: Boolean(item.is_featured),
-        nota: item.note_extra ?? null,
-        allergeni: collectAllergeni(item.pizza_ingredients ?? []),
-      })),
+      pizzas: items.map((item) => {
+        const nomi = (item.pizza_ingredients ?? [])
+          .map((link) => link?.ingredients?.nome)
+          .filter((nome): nome is string => Boolean(nome));
+        return {
+          nome: item.nome,
+          prezzo: Number(item.prezzo_base),
+          ingredienti: formatIngredienti(nomi),
+          ingredientiNomi: nomi,
+          isFeatured: Boolean(item.is_featured),
+          nota: item.note_extra ?? null,
+          allergeni: collectAllergeni(item.pizza_ingredients ?? []),
+        };
+      }),
     };
   });
 
@@ -202,7 +252,27 @@ export async function getMenu(): Promise<MenuData> {
     .map((d) => ({ nome: d.nome, prezzo: Number(d.variazione_prezzo) }))
     .sort((a, b) => a.prezzo - b.prezzo || a.nome.localeCompare(b.nome, "it"));
 
+  const impastiCompleti = ((doughs.data ?? []) as unknown as DbDough[])
+    .filter((d) => d.is_active !== false)
+    .map((d) => ({ nome: d.nome, prezzo: Number(d.variazione_prezzo) }))
+    .sort((a, b) => a.prezzo - b.prezzo || a.nome.localeCompare(b.nome, "it"));
+
   const sizesList = (sizes.data ?? []) as unknown as DbSize[];
+
+  const dimensioni: Dimensione[] = sizesList
+    .filter((s) => s.is_active !== false)
+    .map((s) => ({ nome: s.nome, prezzo: Number(s.variazione_prezzo) }))
+    .sort((a, b) => a.prezzo - b.prezzo || a.nome.localeCompare(b.nome, "it"));
+
+  let ingredientiExtra: IngredienteExtra[] = [];
+  if (ingredienti.error) {
+    console.warn("getMenu: ingredienti extra non disponibili:", ingredienti.error.message);
+  } else {
+    ingredientiExtra = ((ingredienti.data ?? []) as unknown as DbIngredient[])
+      .filter((i) => Number(i.prezzo_aggiunta) >= 0)
+      .map((i) => ({ nome: i.nome, prezzo: Number(i.prezzo_aggiunta) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+  }
   const baby = sizesList.find(
     (s) => s.is_active !== false && s.nome.toLowerCase() === "baby",
   );
@@ -272,14 +342,36 @@ export async function getMenu(): Promise<MenuData> {
     )
     .map((e) => ({ nome: e.nome, prezzo: Number(e.prezzo) }));
 
+  // Messaggi standard per le note (pizza_note): colonne tolleranti.
+  let noteStandard: string[] = [];
+  const note = await supabase.from("pizza_note").select("*");
+  if (note.error) {
+    console.warn("getMenu: note standard non disponibili:", note.error.message);
+  } else {
+    type DbNota = {
+      testo?: string | null;
+      messaggio?: string | null;
+      message?: string | null;
+      text?: string | null;
+      nota?: string | null;
+    };
+    noteStandard = ((note.data ?? []) as unknown as DbNota[])
+      .map((n) => n.testo ?? n.messaggio ?? n.message ?? n.text ?? n.nota)
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "");
+  }
+
   return {
     sections: sectionsOrdinate,
     impasti,
+    impastiCompleti,
+    dimensioni,
+    ingredientiExtra,
     formatoBaby: baby ? Number(baby.variazione_prezzo) : null,
     formati,
     legendaAllergeni,
     teglie,
     extra,
+    noteStandard,
   };
 }
 

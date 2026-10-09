@@ -1,8 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { AllergenIcon, AllergeniPizza } from "@/components/AllergenIcon";
-import { useCart } from "@/lib/cart";
+import PizzaModal from "@/components/PizzaModal";
+import ToastConferma, {
+  useToastConferma,
+} from "@/components/ToastConferma";
+import { useCart, type Personalizzazione, type PizzaDaAggiungere } from "@/lib/cart";
 import { images } from "@/lib/images";
 import {
   Collapsible,
@@ -10,10 +14,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  costruisciOpzioniMini,
   formatPrice,
   type Impasto,
   type MenuData,
   type MenuSection,
+  type OpzioneMini,
   type Pizza,
 } from "@/lib/menu";
 
@@ -28,6 +34,33 @@ const NAV_BOTTOM = HEADER_OFFSET + 56;
 
 const NOTE_LISTINO = ["* Prodotto congelato", "° Radicchio di Treviso solo in stagione"];
 
+// Mini guida all'ordine (design Stitch): i 4 passi del servizio carrello.
+const PASSI_GUIDA = [
+  {
+    titolo: "1. Aggiungi con il tasto +",
+    testo:
+      "Trova la tua pizza preferita e clicca su '+ Aggiungi' per inserirla nel carrello.",
+  },
+  {
+    titolo: "2. Personalizza con la Matita",
+    testo:
+      "Clicca sull'icona della matita per scegliere impasto, formato e dosare gli ingredienti a tuo piacimento.",
+  },
+  {
+    titolo: "3. Controlla il Carrello",
+    testo:
+      "Clicca sull'icona della borsa/carrello in alto a destra nell'header per verificare la lista e il totale calcolato.",
+  },
+  {
+    titolo: "4. Chiama o Invia su WhatsApp",
+    testo:
+      "Tieni la lista sottomano e chiamaci al banco, oppure invia direttamente la tua richiesta di prenotazione via WhatsApp.",
+  },
+];
+
+// Cascata della reveal per le 4 card della guida.
+const GUIDA_DELAY = ["delay-100", "delay-200", "delay-300", "delay-[400ms]"];
+
 const ALLERGENI = [
   "In tutte le nostre pizze sono presenti glutine, lupini, latticini e derivati degli arachidi.",
   "In alcune pizze possono essere presenti anche crostacei, uova e frutta a guscio.",
@@ -41,7 +74,17 @@ const SECTION_SUBTITLE: Record<string, string> = {
   classiche: "I capisaldi della tradizione italiana",
 };
 
-function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
+function PizzaRow({
+  pizza,
+  isLastRow,
+  onAggiungi,
+  onModifica,
+}: {
+  pizza: Pizza;
+  isLastRow: boolean;
+  onAggiungi: () => void;
+  onModifica: (pizza: Pizza) => void;
+}) {
   const { aggiungi } = useCart();
 
   return (
@@ -77,8 +120,11 @@ function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
             type="button"
             title="Aggiungi"
             aria-label={`Aggiungi ${pizza.nome}`}
-            onClick={() => aggiungi(pizza)}
-            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-primary/40 text-primary hover:bg-secondary hover:text-on-secondary hover:border-secondary hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
+            onClick={() => {
+              aggiungi(pizza);
+              onAggiungi();
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-primary/40 text-primary hover:bg-primary hover:text-white hover:border-primary hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
           >
             <span className="material-symbols-outlined text-[13px]! wide:text-[15px]!">add</span>
             <span className="hidden wide:inline">Aggiungi</span>
@@ -87,7 +133,8 @@ function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
             type="button"
             title="Modifica"
             aria-label={`Modifica ${pizza.nome}`}
-            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface hover:border-outline hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
+            onClick={() => onModifica(pizza)}
+            className="inline-flex items-center gap-1 px-2 py-1 wide:px-2.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-outline hover:text-white hover:border-outline hover:scale-105 active:scale-95 cursor-pointer transition-all duration-300 ease-out font-label-sm text-label-sm font-semibold shadow-xs hover:shadow-sm"
           >
             <span className="material-symbols-outlined text-[13px]! wide:text-[15px]!">edit</span>
             <span className="hidden wide:inline">Modifica</span>
@@ -105,17 +152,21 @@ function PizzaRow({ pizza, isLastRow }: { pizza: Pizza; isLastRow: boolean }) {
 function SectionBlock({
   section,
   capitolo,
+  onAggiungi,
+  onModifica,
 }: {
   section: MenuSection;
   /** Numero del "Capitolo NN": le sezioni novità non lo hanno (usano NOVITÀ). */
   capitolo?: number;
+  onAggiungi: () => void;
+  onModifica: (pizza: Pizza, isNovita: boolean) => void;
 }) {
   const subtitle = SECTION_SUBTITLE[section.slug];
   const isNovita = section.isNovita;
 
   return (
     <section
-      className={`menu-section space-y-space-md ${
+      className={`menu-section space-y-space-md scroll-mt-[180px] ${
 
         isNovita ? "p-space-md md:p-space-xl rounded-xl bg-surface-container-low" : ""
       }`}
@@ -155,6 +206,8 @@ function SectionBlock({
               key={pizza.nome}
               pizza={pizza}
               isLastRow={index >= section.pizzas.length - 2}
+              onAggiungi={onAggiungi}
+              onModifica={(p) => onModifica(p, isNovita)}
             />
           ))}
         </div>
@@ -249,7 +302,54 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
   // Legenda allergeni: collassabile solo su mobile (chiusa di default
   // per risparmiare spazio); da md in su è sempre visibile.
   const [legendaAperta, setLegendaAperta] = useState(false);
+  const { toast, mostraToast, chiudiToast } = useToastConferma();
 
+  const mostraConferma = () =>
+    mostraToast("Pizza aggiunta al carrello", "verde");
+
+  // Modale di personalizzazione (bottone "Modifica" di ogni riga).
+  const { aggiungi, aggiungiPersonalizzata } = useCart();
+  const [pizzaModale, setPizzaModale] = useState<{
+    pizza: Pizza;
+    isNovita: boolean;
+    /** Se presente, la modale apre in modalità Mini con queste opzioni. */
+    mini?: OpzioneMini[];
+  } | null>(null);
+  const chiudiModale = useCallback(() => setPizzaModale(null), []);
+  const apriModale = useCallback(
+    (pizza: Pizza, isNovita: boolean) => setPizzaModale({ pizza, isNovita }),
+    [],
+  );
+  // Modale Mini: scegliere una delle mini disponibili e regolarne gli
+  // ingredienti (bottone "Aggiungi" della sezione Baby / Mini).
+  const apriModaleMini = useCallback(() => {
+    const opzioni = costruisciOpzioniMini(menu);
+    if (opzioni.length === 0) return;
+    const prezzoMini =
+      menu.formati.find((f) => f.sigla === "mini")?.prezzo ?? 0;
+    setPizzaModale({
+      pizza: {
+        nome: "Pizza Mini + Mini Bibita",
+        prezzo: prezzoMini,
+        ingredienti: "",
+        ingredientiNomi: [],
+        isFeatured: false,
+        nota: null,
+        allergeni: [],
+      },
+      isNovita: false,
+      mini: opzioni,
+    });
+  }, [menu]);
+  const aggiungiDaModale = (
+    pizza: PizzaDaAggiungere,
+    prezzo: number,
+    personalizza: Personalizzazione | undefined,
+  ) => {
+    aggiungiPersonalizzata(pizza, prezzo, personalizza);
+    setPizzaModale(null);
+    mostraToast("Pizza aggiunta al carrello", "verde");
+  };
   // Pausa dello scroll-spike mentre gira lo scroll programmatico di
   // handleFilter: la pill cliccata resta attiva senza "lampeggiare"
   // attraverso le sezioni intermedie durante lo scorrimento.
@@ -399,6 +499,28 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
 
   return (
     <main className="w-full bg-surface min-h-screen relative">
+      <ToastConferma toast={toast} onChiudi={chiudiToast} />
+
+      {pizzaModale && (
+        <PizzaModal
+          key={pizzaModale.mini ? `mini-${pizzaModale.pizza.nome}` : pizzaModale.pizza.nome}
+          pizza={pizzaModale.pizza}
+          isNovita={pizzaModale.isNovita}
+          modo="aggiungi"
+          modalitaMini={
+            pizzaModale.mini
+              ? { opzioni: pizzaModale.mini, scelta: null }
+              : undefined
+          }
+          dimensioni={menu.dimensioni}
+          impasti={menu.impastiCompleti}
+          ingredientiExtra={menu.ingredientiExtra}
+          extraGenerali={menu.extra}
+          noteStandard={menu.noteStandard}
+          onChiudi={chiudiModale}
+          onConferma={aggiungiDaModale}
+        />
+      )}
 
       <section className="sticky top-0 z-0 h-screen w-full overflow-hidden flex items-center justify-center bg-surface">
 
@@ -485,6 +607,103 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
         </div>
       </section>
 
+      {/* Guida rapida all'ordine (design Stitch): 4 passi per comporre
+          l'ordine e usarlo al banco o su WhatsApp, con reveal a cascata. */}
+      <div className="relative z-10 bg-surface">
+        <section className="max-w-7xl mx-auto px-margin md:px-margin-desktop py-space-md w-full">
+          <div className="rounded-xl border border-surface-container bg-surface-container-lowest shadow-sm p-space-md md:p-space-xl reveal reveal-slow reveal-fade">
+            {/* Intestazione: occhiello, titolo, descrizione e badge laterale */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 border-b border-surface-container pb-space-sm">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container/10 text-primary font-label-sm text-label-sm font-bold uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-[14px]">
+                    help_outline
+                  </span>
+                  Guida rapida all&apos;ordine
+                </span>
+                <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                  Come ordinare e personalizzare in 4 semplici passi
+                </h3>
+                <p className="font-body-md text-body-md text-on-surface-variant">
+                  Componi il tuo ordine per asporto prima di telefonare o
+                  inviare il messaggio WhatsApp.
+                </p>
+              </div>
+              <span className="font-label-sm text-label-sm text-secondary font-semibold hidden md:inline-flex items-center gap-1 shrink-0">
+                <span className="material-symbols-outlined text-[16px]">
+                  speed
+                </span>
+                Veloce &amp; senza attese
+              </span>
+            </div>
+
+            {/* I 4 passi: 1 colonna su mobile, 2 da sm, 4 da lg */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mt-space-md">
+              {PASSI_GUIDA.map((passo, i) => (
+                <div
+                  key={passo.titolo}
+                  className={`p-space-md rounded-xl bg-surface-container-low border border-surface-container flex flex-col justify-between space-y-space-sm reveal reveal-slow reveal-fade ${GUIDA_DELAY[i]}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-bold font-label-md text-label-md flex items-center justify-center shadow-sm">
+                      {i + 1}
+                    </span>
+                    {i === 0 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-primary text-primary font-label-sm text-label-sm font-bold bg-surface-container-lowest">
+                        <span className="material-symbols-outlined text-[14px]">
+                          add
+                        </span>
+                        Aggiungi
+                      </span>
+                    )}
+                    {i === 1 && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-outline-variant text-on-surface-variant font-label-sm text-label-sm font-semibold bg-surface-container-lowest">
+                        <span className="material-symbols-outlined text-[14px] text-secondary">
+                          edit
+                        </span>
+                        Modifica
+                      </span>
+                    )}
+                    {i === 2 && (
+                      <span className="relative p-1.5 rounded-full bg-surface-container-lowest border border-surface-container text-on-surface flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-[20px]">
+                          shopping_bag
+                        </span>
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-secondary text-on-secondary font-label-sm text-[10px] flex items-center justify-center font-bold">
+                          1
+                        </span>
+                      </span>
+                    )}
+                    {i === 3 && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[16px]">
+                            call
+                          </span>
+                        </span>
+                        <span className="w-7 h-7 rounded-full bg-secondary text-on-secondary flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[16px]">
+                            chat
+                          </span>
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-title-md text-title-md font-bold text-on-surface">
+                      {passo.titolo}
+                    </h4>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                      {passo.testo}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+
       <nav className="sticky top-28 z-40 w-full bg-surface-container-lowest/95 backdrop-blur-md shadow-sm py-space-sm">
         <div className="max-w-7xl mx-auto px-margin md:px-margin-desktop flex items-center justify-between gap-space-md">
           <div className="relative flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-nowrap scroll-smooth" id="categoryNav">
@@ -527,20 +746,30 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
         <div className="max-w-7xl mx-auto px-margin md:px-margin-desktop py-space-xl space-y-space-2xl">
 
           {sezioniNovita.map((section) => (
-            <SectionBlock key={section.slug} section={section} />
+            <SectionBlock
+              key={section.slug}
+              section={section}
+              onAggiungi={mostraConferma}
+              onModifica={apriModale}
+            />
           ))}
 
           {sezioniOrdinarie.map((section, index) => (
             <Fragment key={section.slug}>
               {index === 1 && <ImpastiDivider impasti={menu.impasti} />}
-              <SectionBlock section={section} capitolo={index + 1} />
+              <SectionBlock
+                section={section}
+                capitolo={index + 1}
+                onAggiungi={mostraConferma}
+                onModifica={apriModale}
+              />
             </Fragment>
           ))}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
 
             {menu.formati.length > 0 && (
-              <section className="menu-section lg:col-span-5 space-y-space-md" id="cat-baby">
+              <section className="menu-section lg:col-span-5 space-y-space-md scroll-mt-[180px]" id="cat-baby">
               <div className="reveal reveal-slow reveal-fade">
                 <span className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-widest">Capitolo 05</span>
                 <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface">Pizze Baby / Mini</h2>
@@ -571,10 +800,24 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
                         </p>
                       )}
                     </div>
-                    <span className="font-title-lg text-title-lg font-bold text-primary shrink-0 whitespace-nowrap">
-                      {formato.prezzo < 0 ? "−€ " : "€ "}
-                      {formatPrice(Math.abs(formato.prezzo))}
-                    </span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="font-title-lg text-title-lg font-bold text-primary whitespace-nowrap">
+                        {formato.prezzo < 0 ? "−€ " : "€ "}
+                        {formatPrice(Math.abs(formato.prezzo))}
+                      </span>
+                      {formato.sigla === "mini" && (
+                        <button
+                          type="button"
+                          onClick={apriModaleMini}
+                          className="inline-flex items-center gap-1 px-3.5 h-9 rounded-full border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-all cursor-pointer text-xs font-bold shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">
+                            add
+                          </span>
+                          Aggiungi
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -582,7 +825,7 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
             )}
 
             {menu.teglie.length > 0 && (
-              <section className="menu-section lg:col-span-7 space-y-space-md" id="cat-teglie">
+              <section className="menu-section lg:col-span-7 space-y-space-md scroll-mt-[180px]" id="cat-teglie">
                 <div className="reveal reveal-slow reveal-fade">
                   <span className="font-label-sm text-label-sm text-primary font-bold uppercase tracking-widest">Capitolo 06</span>
                   <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface">Le Nostre Teglie</h2>
@@ -647,12 +890,36 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
                   {menu.extra.map((riga, index) => (
                     <li
                       key={riga.nome}
-                      className={`flex items-center justify-between py-1.5 ${index < menu.extra.length - 1 ? "border-b border-surface-container" : ""}`}
+                      className={`flex items-center justify-between gap-2 py-1.5 ${index < menu.extra.length - 1 ? "border-b border-surface-container" : ""}`}
                     >
-                      <span className="pr-3">{riga.nome}</span>
-                      <strong className="text-on-surface shrink-0 whitespace-nowrap">
-                        +€ {formatPrice(riga.prezzo)}
-                      </strong>
+                      <span className="pr-3 min-w-0">{riga.nome}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {/* Solo la porzione di patate fritte è acquistabile
+                            direttamente dal carrello. */}
+                        {riga.nome.toLowerCase().includes("porzione di patate fritte") && (
+                          <button
+                            type="button"
+                            aria-label={`Aggiungi al carrello: ${riga.nome}`}
+                            title="Aggiungi al carrello"
+                            onClick={() => {
+                              aggiungi({
+                                nome: riga.nome,
+                                prezzo: riga.prezzo,
+                                ingredienti: "",
+                              });
+                              mostraToast("Aggiunto al carrello", "verde");
+                            }}
+                            className="w-7 h-7 inline-flex items-center justify-center rounded-full border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-all cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">
+                              add
+                            </span>
+                          </button>
+                        )}
+                        <strong className="text-on-surface whitespace-nowrap">
+                          +€ {formatPrice(riga.prezzo)}
+                        </strong>
+                      </span>
                     </li>
                   ))}
                 </ul>

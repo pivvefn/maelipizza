@@ -44,6 +44,11 @@ function getDateInfo(targetDate: Date): {
   return { weekday, hour, minute };
 }
 
+export function isWeekend(targetDate: Date = new Date()): boolean {
+  const { weekday } = getDateInfo(targetDate);
+  return weekday === "Sat" || weekday === "Sun";
+}
+
 export function getOpeningStatus(targetDate: Date = new Date()): OpeningStatus {
   const { weekday, hour, minute } = getDateInfo(targetDate);
 

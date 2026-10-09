@@ -408,7 +408,7 @@ export default function ChiSiamoPage() {
 
             <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm space-y-2 reveal reveal-fade delay-200">
               <span className="font-headline-lg text-headline-lg font-bold text-secondary">
-                2015
+                2012
               </span>
               <h4 className="font-title-md text-title-md font-bold text-on-surface">
                 Nasce Maeli Pizza
