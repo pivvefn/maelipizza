@@ -38,6 +38,8 @@ export type CartItem = {
   personalizza?: Personalizzazione;
   /** Nome della pizza scelta, se si tratta di una "Pizza Mini + Mini Bibita". */
   mini?: string;
+  /** Categoria del menu di provenienza (es. "Calzoni"). */
+  categoria?: string;
 };
 
 export type PizzaDaAggiungere = {
@@ -46,6 +48,8 @@ export type PizzaDaAggiungere = {
   ingredienti: string;
   /** Nome della pizza mini scelta (solo per il menu Mini). */
   mini?: string;
+  /** Categoria del menu di provenienza (es. "Calzoni"). */
+  categoria?: string;
 };
 
 export type CartState = {
@@ -194,6 +198,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             ingredienti: pizza.ingredienti,
             quantita: 1,
             ...(pizza.mini ? { mini: pizza.mini } : {}),
+            ...(pizza.categoria ? { categoria: pizza.categoria } : {}),
           },
         ];
     scriviStato({ ...corrente, items });
@@ -218,6 +223,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             ingredienti: pizza.ingredienti,
             quantita: 1,
             ...(pizza.mini ? { mini: pizza.mini } : {}),
+            ...(pizza.categoria ? { categoria: pizza.categoria } : {}),
             ...(personalizza ? { personalizza } : {}),
           },
         ],

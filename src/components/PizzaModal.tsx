@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -16,10 +16,16 @@ import {
   type ExtraVoce,
   type Impasto,
   type IngredienteExtra,
+  type NotaMenu,
   type OpzioneMini,
   type Pizza,
 } from "@/lib/menu";
 import { isWeekend } from "@/lib/opening-hours";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type OpzioneFormato = {
   nome: string;
@@ -52,7 +58,7 @@ type PizzaModalProps = {
   ingredientiExtra: IngredienteExtra[];
   extraGenerali: ExtraVoce[];
   /** Messaggi standard cliccabili sotto il campo note (tabella pizza_note). */
-  noteStandard: string[];
+  note: NotaMenu[];
   onChiudi: () => void;
   onConferma: (
     pizza: PizzaDaAggiungere,
@@ -98,40 +104,68 @@ function costoDosaggio(
   return 0;
 }
 
-function TestoSezione({
+/**
+ * Sezione della modale con header sempre visibile e contenuto collassabile
+ * (tutte le sezioni partono chiuse, tranne la scelta mini). L'header mostra
+ * un riassunto sintetico dello stato corrente per rendere chiaro a colpo
+ * d'occhio cosa c'è dentro senza dover aprire.
+ */
+function Sezione({
   numero,
   titolo,
   sottotitolo,
   tag,
+  riassunto,
+  aperta,
+  onToggle,
+  children,
 }: {
   numero: number;
   titolo: string;
   sottotitolo?: string;
   tag?: string;
+  /** Breve sintesi della selezione corrente mostrata accanto al titolo. */
+  riassunto?: string | null;
+  aperta: boolean;
+  onToggle: (aperta: boolean) => void;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 mb-4">
-      <span className="w-7 h-7 shrink-0 rounded-full bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
-        {numero}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-title-lg text-title-lg font-bold text-on-surface">
-            {titolo}
-          </h3>
-          {tag && (
-            <span className="px-2 py-0.5 rounded-full bg-surface-container text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-              {tag}
+    <Collapsible open={aperta} onOpenChange={onToggle}>
+      <CollapsibleTrigger className="group flex w-full items-start gap-3 -mx-1 px-1 py-1 rounded-xl hover:bg-surface-container/50 transition-colors cursor-pointer text-left">
+        <span className="w-7 h-7 shrink-0 rounded-full bg-primary text-on-primary text-xs font-bold flex items-center justify-center mt-0.5">
+          {numero}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="font-title-lg text-title-lg font-bold text-on-surface">
+              {titolo}
+            </span>
+            {tag && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-container text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                {tag}
+              </span>
+            )}
+          </span>
+          {sottotitolo && (
+            <span className="block text-xs text-on-surface-variant mt-0.5">
+              {sottotitolo}
             </span>
           )}
-        </div>
-        {sottotitolo && (
-          <p className="text-xs text-on-surface-variant mt-0.5">
-            {sottotitolo}
-          </p>
-        )}
-      </div>
-    </div>
+        </span>
+        <span className="shrink-0 flex items-center gap-1 mt-0.5">
+          {riassunto && (
+            <span className="max-w-28 truncate px-2 py-0.5 rounded-full bg-surface-container text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+              {riassunto}
+            </span>
+          )}
+          <span className="material-symbols-outlined text-[20px] text-on-surface-variant transition-transform duration-200 group-data-[state=open]:rotate-180">
+            expand_more
+          </span>
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3 pb-1">{children}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -357,7 +391,7 @@ export default function PizzaModal({
   impasti,
   ingredientiExtra,
   extraGenerali,
-  noteStandard,
+  note,
   onChiudi,
   onConferma,
 }: PizzaModalProps) {
@@ -383,6 +417,18 @@ export default function PizzaModal({
   // --- Modalità Mini: si sceglie solo la mini e si regolano gli ingredienti
   // di serie (nessun formato, impasto, extra o note).
   const inModoMini = !!modalitaMini;
+
+  // --- Calzoni: categoria "Calzoni" dal menu. Non prevedono scelta di
+  // formato/dimensione e la loro nota "Da Tagliare" è preimpostata.
+  const eCalzone = !inModoMini && /calzon/i.test(pizza.categoria);
+
+  // --- Sezioni collassabili: tutte chiuse tranne la scelta mini, così
+  // l'utente apre solo l'area che gli interessa.
+  const [sezioni, setSezioni] = useState<Record<string, boolean>>({
+    scelta: !!modalitaMini,
+  });
+  const apriSezione = (chiave: string, aperta: boolean) =>
+    setSezioni((corrente) => ({ ...corrente, [chiave]: aperta }));
   const [miniScelta, setMiniScelta] = useState<string | null>(
     modalitaMini?.scelta ?? null,
   );
@@ -476,7 +522,17 @@ export default function PizzaModal({
     }
     return base;
   });
-  const [nota, setNota] = useState(personalizzaIniziale?.nota ?? "");
+  const [nota, setNota] = useState(() => {
+    const base = personalizzaIniziale?.nota ?? "";
+    if (!eCalzone) return base;
+    // Calzone: "Da Tagliare" è già una nota della pizza — se non c'è ancora,
+    // la preimpostiamo (senza duplicarla su riaperture).
+    if (/da\s*taglia/i.test(base)) return base;
+    const testoTagliare =
+      note.find((n) => n.zona === "pizza" && /taglia/i.test(n.testo))?.testo ??
+      "Da tagliare";
+    return appendiNota(base, testoTagliare);
+  });
   const [ricerca, setRicerca] = useState("");
 
   const prezzoIngrediente = (nome: string) =>
@@ -509,6 +565,18 @@ export default function PizzaModal({
         (extras[a.nome] !== undefined ? 0 : 1) -
         (extras[b.nome] !== undefined ? 0 : 1),
     );
+
+  // --- Note per zona (pizza_note.category): "ingrediente" accanto ai
+  // dosaggi, "pizza" sotto il campo note.
+  const notePizza = note.filter((n) => n.zona === "pizza");
+  const noteIngrediente = note.filter((n) => n.zona === "ingrediente");
+
+  // --- Sintesi per gli header delle sezioni collassate.
+  const quanteModifiche = ingredientiAttuali.filter((nome) => {
+    const stato = dosaggi[nome];
+    return stato !== undefined && stato !== "normale";
+  }).length;
+  const quantiExtra = Object.keys(extras).length;
 
   // --- TOTALE live + riepilogo (i supplementi possono essere negativi: sconti)
   let totale = pizza.prezzo;
@@ -685,13 +753,15 @@ export default function PizzaModal({
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-7">
           {/* 1 — Scegli la mini (modalità Mini) oppure Formato & Dimensione */}
           {inModoMini ? (
-            <section>
-              <TestoSezione
-                numero={1}
-                titolo="Scegli la Pizza Mini"
-                sottotitolo="Seleziona una delle mini disponibili"
-                tag="Obbligatorio"
-              />
+            <Sezione
+              numero={1}
+              titolo="Scegli la Pizza Mini"
+              sottotitolo="Seleziona una delle mini disponibili"
+              tag="Obbligatorio"
+              riassunto={miniScelta ?? "Da scegliere"}
+              aperta={sezioni.scelta ?? false}
+              onToggle={(aperta) => apriSezione("scelta", aperta)}
+            >
               <div
                 role="radiogroup"
                 aria-label="Pizza Mini"
@@ -739,42 +809,66 @@ export default function PizzaModal({
                   Seleziona una pizza mini per continuare.
                 </p>
               )}
-            </section>
+            </Sezione>
           ) : (
-            <section>
-              <TestoSezione
-                numero={1}
-                titolo="Formato & Dimensione"
-                tag="Obbligatorio"
-              />
-              <div
-                role="radiogroup"
-                aria-label="Formato e dimensione"
-                className="grid grid-cols-1 sm:grid-cols-3 gap-2"
-              >
-                {opzioniFormato.map((opzione) => (
-                  <OpzioneRadio
-                    key={opzione.nome}
-                    nome={opzione.nome}
-                    nota={opzione.nota}
-                    prezzo={opzione.prezzo}
-                    attivo={formatoScelto?.nome === opzione.nome}
-                    disabilitato={opzione.eBattuta && weekend}
-                    onClick={() => setFormato(opzione.nome)}
-                  />
-                ))}
-              </div>
-            </section>
+            <Sezione
+              numero={1}
+              titolo="Formato & Dimensione"
+              tag="Obbligatorio"
+              riassunto={
+                eCalzone ? "Formato unico" : (formatoScelto?.nome ?? null)
+              }
+              aperta={sezioni.scelta ?? false}
+              onToggle={(aperta) => apriSezione("scelta", aperta)}
+            >
+              {eCalzone ? (
+                <div className="rounded-xl border-2 border-dashed border-surface-container bg-surface-container/40 px-4 py-3.5">
+                  <p className="font-title-md text-title-md font-bold text-on-surface flex items-center gap-2">
+                    <span
+                      className="material-symbols-outlined text-[18px] text-primary"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      content_cut
+                    </span>
+                    Formato unico — Da tagliare
+                  </p>
+                  <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                    Il calzone non prevede scelta di formato o dimensione: la
+                    fornaio lo taglierà come da indicazione.
+                  </p>
+                </div>
+              ) : (
+                <div
+                  role="radiogroup"
+                  aria-label="Formato e dimensione"
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+                >
+                  {opzioniFormato.map((opzione) => (
+                    <OpzioneRadio
+                      key={opzione.nome}
+                      nome={opzione.nome}
+                      nota={opzione.nota}
+                      prezzo={opzione.prezzo}
+                      attivo={formatoScelto?.nome === opzione.nome}
+                      disabilitato={opzione.eBattuta && weekend}
+                      onClick={() => setFormato(opzione.nome)}
+                    />
+                  ))}
+                </div>
+              )}
+            </Sezione>
           )}
 
           {/* 2 — Impasto */}
           {!inModoMini && impasti.length > 0 && (
-            <section>
-              <TestoSezione
-                numero={2}
-                titolo="Impasto a Lunga Lievitazione"
-                sottotitolo="Seleziona 1 impasto"
-              />
+            <Sezione
+              numero={2}
+              titolo="Impasto a Lunga Lievitazione"
+              sottotitolo="Seleziona 1 impasto"
+              riassunto={impastoScelto?.nome ?? null}
+              aperta={sezioni.impasto ?? false}
+              onToggle={(aperta) => apriSezione("impasto", aperta)}
+            >
               <div
                 role="radiogroup"
                 aria-label="Impasto"
@@ -791,16 +885,20 @@ export default function PizzaModal({
                   />
                 ))}
               </div>
-            </section>
+            </Sezione>
           )}
 
           {/* 3 — Ingredienti di serie & dosaggio */}
-          <section>
-            <TestoSezione
-              numero={inModoMini ? 2 : 3}
-              titolo="Ingredienti di Serie & Dosaggio"
-              sottotitolo="Modifica le quantità o rimuovi un ingrediente"
-            />
+          <Sezione
+            numero={inModoMini ? 2 : 3}
+            titolo="Ingredienti di Serie & Dosaggio"
+            sottotitolo="Modifica le quantità o rimuovi un ingrediente"
+            riassunto={
+              quanteModifiche > 0 ? `${quanteModifiche} modifiche` : "Standard"
+            }
+            aperta={sezioni.dosaggi ?? false}
+            onToggle={(aperta) => apriSezione("dosaggi", aperta)}
+          >
             <div className="space-y-2.5">
               {ingredientiAttuali.map((nome) => {
                 const stato = dosaggi[nome] ?? "normale";
@@ -864,16 +962,44 @@ export default function PizzaModal({
                 );
               })}
             </div>
-          </section>
+            {!inModoMini && noteIngrediente.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-surface-container">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant mb-2 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">
+                    nutrition
+                  </span>
+                  Note per ingredienti
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {noteIngrediente.map((notaIng) => (
+                    <button
+                      key={notaIng.id}
+                      type="button"
+                      onClick={() =>
+                        setNota((corrente) => appendiNota(corrente, notaIng.testo))
+                      }
+                      title={`Aggiungi alle note: ${notaIng.testo}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-outline-variant bg-surface-container/50 text-on-surface-variant text-[11px] font-semibold hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">add</span>
+                      <span className="max-w-40 truncate">{notaIng.testo}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Sezione>
 
           {/* 4 — Aggiungi ingredienti extra */}
           {!inModoMini && (
-          <section>
-            <TestoSezione
-              numero={4}
-              titolo="Aggiungi Ingredienti Extra"
-              sottotitolo="Supplementi a piacere"
-            />
+          <Sezione
+            numero={4}
+            titolo="Aggiungi Ingredienti Extra"
+            sottotitolo="Supplementi a piacere"
+            riassunto={quantiExtra > 0 ? `${quantiExtra} scelti` : null}
+            aperta={sezioni.extra ?? false}
+            onToggle={(aperta) => apriSezione("extra", aperta)}
+          >
             {disponibili.length === 0 ? (
               <p className="text-sm text-on-surface-variant rounded-xl bg-surface-container px-4 py-3">
                 Nessun ingrediente extra disponibile per questa pizza.
@@ -979,17 +1105,19 @@ export default function PizzaModal({
                 )}
               </>
             )}
-          </section>
+          </Sezione>
           )}
 
           {/* 5 — Note */}
           {!inModoMini && (
-          <section>
-            <TestoSezione
-              numero={5}
-              titolo="Note Speciali per il Fornaio"
-              sottotitolo="Specifiche di cottura, intolleranze o indicazioni di taglio."
-            />
+          <Sezione
+            numero={5}
+            titolo="Note Speciali per il Fornaio"
+            sottotitolo="Specifiche di cottura, intolleranze o indicazioni di taglio."
+            riassunto={nota.trim() ? "Compilata" : null}
+            aperta={sezioni.note ?? false}
+            onToggle={(aperta) => apriSezione("note", aperta)}
+          >
             <Textarea
               value={nota}
               onChange={(event) => setNota(event.target.value.slice(0, 120))}
@@ -998,25 +1126,31 @@ export default function PizzaModal({
               placeholder="Es.: ben cotta, tagliate a metà, senza basilico…"
               className="min-h-20 text-sm resize-none placeholder:opacity-40"
             />
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {noteStandard.map((notaStandard) => (
-                <button
-                  key={notaStandard}
-                  type="button"
-                  onClick={() => setNota((corrente) => appendiNota(corrente, notaStandard))}
-                  title={`Aggiungi alle note: ${notaStandard}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-outline-variant bg-surface-container/50 text-on-surface-variant text-[11px] font-semibold hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[14px]">add</span>
-                  <span className="material-symbols-outlined text-[14px]">message</span>
-                  <span className="max-w-40 truncate">{notaStandard}</span>
-                </button>
-              ))}
-            </div>
+            {notePizza.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {notePizza.map((notaPizzaVoce) => (
+                  <button
+                    key={notaPizzaVoce.id}
+                    type="button"
+                    onClick={() =>
+                      setNota((corrente) =>
+                        appendiNota(corrente, notaPizzaVoce.testo),
+                      )
+                    }
+                    title={`Aggiungi alle note: ${notaPizzaVoce.testo}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-outline-variant bg-surface-container/50 text-on-surface-variant text-[11px] font-semibold hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add</span>
+                    <span className="material-symbols-outlined text-[14px]">message</span>
+                    <span className="max-w-40 truncate">{notaPizzaVoce.testo}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="text-right text-[11px] text-on-surface-variant mt-1">
               {nota.length}/120 car.
             </div>
-          </section>
+          </Sezione>
           )}
         </div>
 

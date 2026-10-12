@@ -192,6 +192,7 @@ export default function CarrelloMain({ menu }: { menu: MenuData }) {
         isFeatured: false,
         nota: null,
         allergeni: [],
+        categoria: item.categoria ?? "",
       },
       ...(item.personalizza ? { personalizza: item.personalizza } : {}),
       ...(item.mini
@@ -543,23 +544,33 @@ export default function CarrelloMain({ menu }: { menu: MenuData }) {
                   placeholder="Es.: ben cucinate, tagliate a metà, senza basilico…"
                   className="min-h-20 text-xs sm:text-sm placeholder:opacity-40"
                 />
-                {menu.noteStandard.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                    {menu.noteStandard.map((notaStandard) => (
-                      <button
-                        key={notaStandard}
-                        type="button"
-                        onClick={() => impostaNota(appendiNota(nota, notaStandard))}
-                        title={`Aggiungi alle note: ${notaStandard}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-outline-variant bg-surface-container/50 text-on-surface-variant text-[11px] font-semibold hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">add</span>
-                        <span className="material-symbols-outlined text-[14px]">message</span>
-                        <span className="max-w-40 truncate">{notaStandard}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  // Solo le note con zona "carrello" (messaggi generali
+                  // dell'ordine, es. "pizza ben cotte").
+                  const noteCarrello = menu.note.filter(
+                    (n) => n.zona === "carrello",
+                  );
+                  if (noteCarrello.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {noteCarrello.map((notaCarrello) => (
+                        <button
+                          key={notaCarrello.id}
+                          type="button"
+                          onClick={() =>
+                            impostaNota(appendiNota(nota, notaCarrello.testo))
+                          }
+                          title={`Aggiungi alle note: ${notaCarrello.testo}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-outline-variant bg-surface-container/50 text-on-surface-variant text-[11px] font-semibold hover:border-primary hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">add</span>
+                          <span className="material-symbols-outlined text-[14px]">message</span>
+                          <span className="max-w-40 truncate">{notaCarrello.testo}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="mt-6 p-5 rounded-xl bg-surface-container-low">
@@ -834,7 +845,7 @@ export default function CarrelloMain({ menu }: { menu: MenuData }) {
           impasti={menu.impastiCompleti}
           ingredientiExtra={menu.ingredientiExtra}
           extraGenerali={menu.extra}
-          noteStandard={menu.noteStandard}
+          note={menu.note}
           onChiudi={chiudiModale}
           onConferma={confermaModifiche}
         />

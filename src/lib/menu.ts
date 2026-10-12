@@ -10,6 +10,9 @@ export type Pizza = {
   nota: string | null;
 
   allergeni: number[];
+
+  /** Nome della categoria del menu da cui proviene (es. "Calzoni"). */
+  categoria: string;
 };
 
 export type MenuSection = {
@@ -47,6 +50,22 @@ export type AllergeneLegenda = {
 
 export type ExtraVoce = { nome: string; prezzo: number };
 
+/** Zona del menu in cui un messaggio standard può essere proposto. */
+export type NotaMenuZona = "ingrediente" | "pizza" | "carrello";
+
+/** Messaggio standard per le note (tabella pizza_note). */
+export type NotaMenu = {
+  id: number | string;
+  testo: string;
+  zona: NotaMenuZona;
+};
+
+const ZONE_NOTE: ReadonlySet<string> = new Set([
+  "ingrediente",
+  "pizza",
+  "carrello",
+]);
+
 export type MenuData = {
   sections: MenuSection[];
   impasti: Impasto[];
@@ -66,7 +85,7 @@ export type MenuData = {
   extra: ExtraVoce[];
 
   /** Messaggi standard predefiniti per le note (tabella pizza_note). */
-  noteStandard: string[];
+  note: NotaMenu[];
 };
 
 /** Voce del menu Mini: nome della mini + i suoi ingredienti dal listino. */
@@ -237,6 +256,7 @@ export async function getMenu(): Promise<MenuData> {
           isFeatured: Boolean(item.is_featured),
           nota: item.note_extra ?? null,
           allergeni: collectAllergeni(item.pizza_ingredients ?? []),
+          categoria: category.nome,
         };
       }),
     };
@@ -343,21 +363,32 @@ export async function getMenu(): Promise<MenuData> {
     .map((e) => ({ nome: e.nome, prezzo: Number(e.prezzo) }));
 
   // Messaggi standard per le note (pizza_note): colonne tolleranti.
-  let noteStandard: string[] = [];
-  const note = await supabase.from("pizza_note").select("*");
-  if (note.error) {
-    console.warn("getMenu: note standard non disponibili:", note.error.message);
+  let note: NotaMenu[] = [];
+  const noteRows = await supabase.from("pizza_note").select("*");
+  if (noteRows.error) {
+    console.warn("getMenu: note standard non disponibili:", noteRows.error.message);
   } else {
     type DbNota = {
+      id?: number | string;
       testo?: string | null;
       messaggio?: string | null;
       message?: string | null;
       text?: string | null;
       nota?: string | null;
+      category?: string | null;
     };
-    noteStandard = ((note.data ?? []) as unknown as DbNota[])
-      .map((n) => n.testo ?? n.messaggio ?? n.message ?? n.text ?? n.nota)
-      .filter((t): t is string => typeof t === "string" && t.trim() !== "");
+    note = ((noteRows.data ?? []) as unknown as DbNota[])
+      .map((n, idx) => {
+        const testo = (n.testo ?? n.messaggio ?? n.message ?? n.text ?? n.nota)
+          ?.trim();
+        if (!testo) return null;
+        const categoria = n.category?.trim().toLowerCase() ?? "";
+        const zona = ZONE_NOTE.has(categoria)
+          ? (categoria as NotaMenuZona)
+          : "pizza";
+        return { id: n.id ?? idx, testo, zona };
+      })
+      .filter((n): n is NotaMenu => n !== null);
   }
 
   return {
@@ -371,7 +402,7 @@ export async function getMenu(): Promise<MenuData> {
     legendaAllergeni,
     teglie,
     extra,
-    noteStandard,
+    note,
   };
 }
 

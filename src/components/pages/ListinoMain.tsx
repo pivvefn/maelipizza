@@ -336,6 +336,7 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
         isFeatured: false,
         nota: null,
         allergeni: [],
+        categoria: "",
       },
       isNovita: false,
       mini: opzioni,
@@ -516,7 +517,7 @@ export default function ListinoMain({ menu }: { menu: MenuData }) {
           impasti={menu.impastiCompleti}
           ingredientiExtra={menu.ingredientiExtra}
           extraGenerali={menu.extra}
-          noteStandard={menu.noteStandard}
+          note={menu.note}
           onChiudi={chiudiModale}
           onConferma={aggiungiDaModale}
         />
